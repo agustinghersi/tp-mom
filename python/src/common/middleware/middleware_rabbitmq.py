@@ -8,23 +8,24 @@ import os
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
     def __init__(self, host, queue_name):
-        pass
+        self.host = host
+        self.queue_name = queue_name
 
     # Receptor de HOla Mundo
     def start_consuming(self, on_message_callback):
         try:
             # Aca conecto a un broker de localhost para recibir mensajes
-            connection = pika.BlockingConnection(pika.ConnectionParameters('localhost')) # POner IP de otra maquina para enviarlo ahi
+            connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
             channel = connection.channel()
 
             # Creacion de queue idempotente, conviene siempre hacerlo 2 veces
-            channel.queue_declare(queue='hello', durable=True, arguments={'x-queue-type': 'quorum'})
+            channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
 
             # Utilizo la funcion callback que invoca pika para leer un mensaje de la cola
             def callback(ch, method, properties, body):
                 print(f" [x] Received {body}")
             
-            channel.basic_consume(queue='hello',
+            channel.basic_consume(queue=self.queue_name,
                         auto_ack=True,
                         on_message_callback=callback)
 
@@ -53,7 +54,9 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
-        pass
+        self.host = host
+        self.exchange_name = exchange_name
+        self.routing_keys = routing_keys
 
     def start_consuming(self, on_message_callback):
         pass
@@ -64,15 +67,15 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     # Sender de Hola Mundo
     def send(self, message):
         # Aca conecto a un broker de localhost
-        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost')) # POner IP de otra maquina para enviarlo ahi
+        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
         channel = connection.channel()
 
         # Declaro la queue a la que envio los mensajes
-        channel.queue_declare(queue='hello', durable=True, arguments={'x-queue-type': 'quorum'})
+        channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
 
         # Aca se manda el Hola Mundo a la queue hello
         channel.basic_publish(exchange='',
-                      routing_key='hello',
+                      routing_key=self.routing_keys,
                       body='Hello World!')
         print(" [x] Sent 'Hello World!'")
 
