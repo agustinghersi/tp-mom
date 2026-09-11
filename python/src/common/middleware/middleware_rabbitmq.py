@@ -74,7 +74,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
 
         # Aca se manda el Hola Mundo a la queue hello
-        channel.basic_publish(exchange='',
+        channel.basic_publish(exchange=self.exchange_name,
                       routing_key=self.routing_keys,
                       body='Hello World!')
         print(" [x] Sent 'Hello World!'")
