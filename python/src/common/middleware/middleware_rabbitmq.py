@@ -11,11 +11,10 @@ import os
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
     def __init__(self, host, queue_name):
-        # Aca conecto a un broker de localhost
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host)) # POner IP de otra maquina para enviarlo ahi
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host))
         channel = connection.channel()
-        # Declaro la queue a la que envio los mensajes
         channel.queue_declare(queue=queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
+        
         self.channel = channel
         self.connection = connection
         self.queue_name = queue_name
@@ -59,11 +58,11 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host)) # POner IP de otra maquina para enviarlo ahi
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host))
         channel = connection.channel()
-        # Creo el exchange
-        channel.exchange_declare(exchange=exchange_name, exchange_type='direct')
+        channel.exchange_declare(exchange=exchange_name, exchange_type='direct') # Creo el exchange
         # direct manda mensajes a las colas con binding key = routing key
+        
         self.channel = channel
         self.connection = connection
         self.exchange_name = exchange_name
