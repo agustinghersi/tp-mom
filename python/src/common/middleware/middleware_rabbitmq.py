@@ -64,7 +64,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
         # Mando un mensaje o el hola mundo
         message = ' '.join(sys.argv[1:]) or "Hello World!"
-        channel.basic_publish(exchange=self.exchange_name,
+        channel.basic_publish(exchange=self.exchange_name, # Ver que poner aca, no tengo el nombre
                       routing_key=self.routing_keys,
                       body=message,
                       properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
@@ -87,13 +87,39 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         self.routing_keys = routing_keys
 
     def start_consuming(self, on_message_callback):
-        pass
+        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
+        channel = connection.channel()
+
+        channel.exchange_declare(exchange=self.exchange_name, exchange_type='fanout')
+        
+        result = channel.queue_declare(queue='', exclusive=True)
+        queue_name = result.method.queue # Rabbit me da el nombre de la queue
+
+        channel.queue_bind(exchange=self.exchange_name, queue=queue_name)
+        print(' [*] Waiting for logs. To exit press CTRL+C')
+
+        channel.basic_consume(
+            queue=queue_name, on_message_callback=on_message_callback, auto_ack=True)
+
+        channel.start_consuming()
     
     def stop_consuming(self):
         pass
 
     def send(self, message):
-        pass
+        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
+        channel = connection.channel()
+
+        # Creo el exchange
+        channel.exchange_declare(exchange=self.exchange_name, exchange_type='fanout')
+        # fanout manda cada mensaje a cada cola conocida
+
+        # Envio el mensaje o un hola mundo por defecto
+        message = ' '.join(sys.argv[1:]) or "info: Hello World!"
+        channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_keys, body=message)
+        print(f" [x] Sent {message}")
+        connection.close()
+
 
     def close(self):
         pass
