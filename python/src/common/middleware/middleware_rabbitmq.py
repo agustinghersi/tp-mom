@@ -11,27 +11,26 @@ import os
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
     def __init__(self, host, queue_name):
-        self.host = host
+        # Aca conecto a un broker de localhost
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host)) # POner IP de otra maquina para enviarlo ahi
+        channel = connection.channel()
+        # Declaro la queue a la que envio los mensajes
+        channel.queue_declare(queue=queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
+        self.channel = channel
+        self.connection = connection
         self.queue_name = queue_name
 
     # Receptor de HOla Mundo
     def start_consuming(self, on_message_callback):
         try:
-            # Aca conecto a un broker de localhost para recibir mensajes
-            connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
-            channel = connection.channel()
-
-            # Creacion de queue idempotente, conviene siempre hacerlo 2 veces
-            channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
-            
-            channel.basic_qos(prefetch_count=1) # Hasta no terminar la tarea, Rabbit no envia otra al worker
+            self.channel.basic_qos(prefetch_count=1) # Hasta no terminar la tarea, Rabbit no envia otra al worker
             # Ver que esto puede dar error de llenar la queue despues
-            channel.basic_consume(queue=self.queue_name,
+            self.channel.basic_consume(queue=self.queue_name,
                         on_message_callback=on_message_callback) # Saco el ACK automatico
 
             # Aca se entra en un bucle infinito, se sale con ctrl C
             print(' [*] Waiting for messages. To exit press CTRL+C')
-            channel.start_consuming()
+            self.channel.start_consuming()
         except KeyboardInterrupt:
             print('Interrupted')
             try:
@@ -44,73 +43,57 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         pass
     
     def send(self, message):
-        # Aca conecto a un broker de localhost
-        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
-        channel = connection.channel()
-
-        # Declaro la queue a la que envio los mensajes
-        channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
-
         # Mando el mensaje
-        channel.basic_publish(exchange='',
+        self.channel.basic_publish(exchange='',
                       routing_key=self.queue_name,
                       body=message,
                       properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
                          delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
                       ))
 
-        # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
-        connection.close()
-
     def close(self):
-        pass
+        # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
+        self.connection.close()
     
 
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
-        self.host = host
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host)) # POner IP de otra maquina para enviarlo ahi
+        channel = connection.channel()
+        # Creo el exchange
+        channel.exchange_declare(exchange=exchange_name, exchange_type='direct')
+        # direct manda mensajes a las colas con binding key = routing key
+        self.channel = channel
+        self.connection = connection
         self.exchange_name = exchange_name
         self.routing_keys = routing_keys
 
     def start_consuming(self, on_message_callback):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
-        channel = connection.channel()
-
-        channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
-        
-        result = channel.queue_declare(queue='', exclusive=True)
+        result = self.channel.queue_declare(queue='', exclusive=True)
         queue_name = result.method.queue # Rabbit me da el nombre de la queue
 
         # Hago un binding por cada rputing key
         for key in self.routing_keys:
-            channel.queue_bind(exchange=self.exchange_name, 
+            self.channel.queue_bind(exchange=self.exchange_name, 
                         queue=queue_name, 
                         routing_key=key)
         # Ver error si routing_keys esta vacio
 
-        channel.basic_consume(
+        self.channel.basic_consume(
             queue=queue_name, on_message_callback=on_message_callback, auto_ack=True)
 
-        channel.start_consuming()
+        self.channel.start_consuming()
     
     def stop_consuming(self):
         pass
 
     def send(self, message):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
-        channel = connection.channel()
-
-        # Creo el exchange
-        channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
-        # direct manda mensajes a las colas con binding key = routing key
-
         # Envio el mensaje a cada routing key
         for key in self.routing_keys:
-            channel.basic_publish(exchange=self.exchange_name, 
+            self.channel.basic_publish(exchange=self.exchange_name, 
                         routing_key=key, 
                         body=message)
-        connection.close()
 
     def close(self):
-        pass
+        self.connection.close()
