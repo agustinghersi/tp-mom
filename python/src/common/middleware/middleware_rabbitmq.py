@@ -55,28 +55,6 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         pass
     
     def send(self, message):
-        pass
-
-
-    def close(self):
-        pass
-    
-
-class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
-    
-    def __init__(self, host, exchange_name, routing_keys):
-        self.host = host
-        self.exchange_name = exchange_name
-        self.routing_keys = routing_keys
-
-    def start_consuming(self, on_message_callback):
-        pass
-    
-    def stop_consuming(self):
-        pass
-
-    # Sender de Hola Mundo
-    def send(self, message):
         # Aca conecto a un broker de localhost
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.host)) # POner IP de otra maquina para enviarlo ahi
         channel = connection.channel()
@@ -96,6 +74,26 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
 
         # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
         connection.close()
+
+    def close(self):
+        pass
+    
+
+class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
+    
+    def __init__(self, host, exchange_name, routing_keys):
+        self.host = host
+        self.exchange_name = exchange_name
+        self.routing_keys = routing_keys
+
+    def start_consuming(self, on_message_callback):
+        pass
+    
+    def stop_consuming(self):
+        pass
+
+    def send(self, message):
+        pass
 
     def close(self):
         pass
