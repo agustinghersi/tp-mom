@@ -52,8 +52,8 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         channel.queue_declare(queue=self.queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
 
         # Mando el mensaje
-        channel.basic_publish(exchange=self.exchange_name, # Ver que poner aca, no tengo el nombre
-                      routing_key=self.routing_keys,
+        channel.basic_publish(exchange='',
+                      routing_key=self.queue_name,
                       body=message,
                       properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
                          delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
@@ -102,7 +102,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         # fanout manda cada mensaje a cada cola conocida
 
         # Envio el mensaje
-        channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_keys, body=message)
+        channel.basic_publish(exchange=self.exchange_name, routing_key='', body=message)
         connection.close()
 
     def close(self):
