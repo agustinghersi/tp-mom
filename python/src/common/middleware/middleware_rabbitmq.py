@@ -101,12 +101,9 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         channel.exchange_declare(exchange=self.exchange_name, exchange_type='fanout')
         # fanout manda cada mensaje a cada cola conocida
 
-        # Envio el mensaje o un hola mundo por defecto
-        message = ' '.join(sys.argv[1:]) or "info: Hello World!"
+        # Envio el mensaje
         channel.basic_publish(exchange=self.exchange_name, routing_key=self.routing_keys, body=message)
-        print(f" [x] Sent {message}")
         connection.close()
-
 
     def close(self):
         pass
