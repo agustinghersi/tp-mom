@@ -24,8 +24,16 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         try:
             self.channel.basic_qos(prefetch_count=1) # Hasta no terminar la tarea, Rabbit no envia otra al worker
             # Ver que esto puede dar error de llenar la queue despues
+
+            def callback(ch, method, properties, body):
+                on_message_callback(
+                    message=body,
+                    ack=lambda: ch.basic_ack(delivery_tag=method.delivery_tag),
+                    nack=lambda: ch.basic_nack(delivery_tag=method.delivery_tag)
+                )
+            
             self.channel.basic_consume(queue=self.queue_name,
-                        on_message_callback=on_message_callback) # Saco el ACK automatico
+                        on_message_callback=callback) # Saco el ACK automatico
 
             # Aca se entra en un bucle infinito, se sale con ctrl C
             print(' [*] Waiting for messages. To exit press CTRL+C')
@@ -39,7 +47,8 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
 
     def stop_consuming(self):
-        pass
+        self.channel.stop_consuming()
+        # Ver despues caso de error y si no estaba consumiendo
     
     def send(self, message):
         # Mando el mensaje
@@ -85,7 +94,8 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         self.channel.start_consuming()
     
     def stop_consuming(self):
-        pass
+        self.channel.stop_consuming()
+        # Ver despues caso de error y si no estaba consumiendo
 
     def send(self, message):
         # Envio el mensaje a cada routing key
