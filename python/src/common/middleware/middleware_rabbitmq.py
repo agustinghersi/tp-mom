@@ -45,7 +45,6 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             except SystemExit:
                 os._exit(0)
 
-
     def stop_consuming(self):
         self.channel.stop_consuming()
         # Ver despues caso de error y si no estaba consumiendo
@@ -62,7 +61,6 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
     def close(self):
         # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
         self.connection.close()
-    
 
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
@@ -88,8 +86,15 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
                         routing_key=key)
         # Ver error si routing_keys esta vacio
 
+        def callback(ch, method, properties, body):
+            on_message_callback(
+                message=body,
+                ack=lambda: ch.basic_ack(delivery_tag=method.delivery_tag),
+                nack=lambda: ch.basic_nack(delivery_tag=method.delivery_tag)
+            )
+
         self.channel.basic_consume(
-            queue=queue_name, on_message_callback=on_message_callback, auto_ack=True)
+            queue=queue_name, on_message_callback=callback) # El ACK automatico del tutorial rompia el test
 
         self.channel.start_consuming()
     
