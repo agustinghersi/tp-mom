@@ -1,7 +1,7 @@
 import pika
 import random
 import string
-from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError
 import sys
 import os
 
@@ -58,9 +58,13 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                          delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
                       ))
 
+    # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
     def close(self):
-        # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
-        self.connection.close()
+        try:
+            if self.connection.is_open: # Para hacer close solo si la conexion esta abierta
+                self.connection.close()
+        except Exception as error:
+            raise MessageMiddlewareCloseError(error) # Levanto el error pedido
 
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
@@ -108,6 +112,10 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             self.channel.basic_publish(exchange=self.exchange_name, 
                         routing_key=key, 
                         body=message)
-
+ 
     def close(self):
-        self.connection.close()
+        try:
+            if self.connection.is_open: # Para hacer close solo si la conexion esta abierta
+                self.connection.close()
+        except Exception as error:
+            raise MessageMiddlewareCloseError(error) # Levanto el error pedido
