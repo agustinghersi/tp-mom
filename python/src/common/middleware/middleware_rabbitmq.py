@@ -14,12 +14,13 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters(host))
             channel = connection.channel()
-            channel.queue_declare(queue=queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
+            channel.queue_declare(queue=queue_name, durable=True)
             
             self.channel = channel
             self.connection = connection
             self.queue_name = queue_name
         except pika.exceptions.AMQPError as error:
+            # Revisar que error conviene levantar
             raise MessageMiddlewareDisconnectedError(error)
 
     # Receptor de HOla Mundo
@@ -49,8 +50,11 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                 os._exit(0)
 
     def stop_consuming(self):
-        self.channel.stop_consuming()
-        # Ver despues caso de error y si no estaba consumiendo
+        try:
+            if self.channel.is_open:
+                self.channel.stop_consuming()
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(error)
     
     def send(self, message):
         # Mando el mensaje
@@ -108,8 +112,11 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         self.channel.start_consuming()
     
     def stop_consuming(self):
-        self.channel.stop_consuming()
-        # Ver despues caso de error y si no estaba consumiendo
+        try:
+            if self.channel.is_open:
+                self.channel.stop_consuming()
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(error)
 
     def send(self, message):
         # Envio el mensaje a cada routing key
