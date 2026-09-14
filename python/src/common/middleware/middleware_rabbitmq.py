@@ -56,15 +56,17 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
     
     def send(self, message):
         try:
-            if not self.channel or self.channel.is_closed:
-                raise MessageMiddlewareDisconnectedError("El channel no esta disponible")
             self.channel.basic_publish(exchange='',
                         routing_key=self.queue_name,
                         body=message,
                         properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
                             delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
                         ))
+        except pika.exceptions.AMQPConectionError as error:
+            # Este error para probelmas de conexion
+            raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
+            # El MessageError en cualquier otro caso
             raise MessageMiddlewareMessageError(error)
 
     def close(self):
@@ -122,13 +124,15 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
 
     def send(self, message):
         try:
-            if not self.channel or self.channel.is_closed:
-                raise MessageMiddlewareDisconnectedError("El channel no esta disponible para enviar")
             for key in self.routing_keys:
                 self.channel.basic_publish(exchange=self.exchange_name, 
                             routing_key=key, 
                             body=message)
+        except pika.exceptions.AMQPConectionError as error:
+            # Este error para probelmas de conexion
+            raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
+            # El MessageError en cualquier otro caso
             raise MessageMiddlewareMessageError(error)
  
     def close(self):
