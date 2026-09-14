@@ -1,7 +1,7 @@
 import pika
 import random
 import string
-from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError
+from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError
 import sys
 import os
 
@@ -11,13 +11,16 @@ import os
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
     def __init__(self, host, queue_name):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host))
-        channel = connection.channel()
-        channel.queue_declare(queue=queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
-        
-        self.channel = channel
-        self.connection = connection
-        self.queue_name = queue_name
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+            channel = connection.channel()
+            channel.queue_declare(queue=queue_name, durable=True, arguments={'x-queue-type': 'quorum'})
+            
+            self.channel = channel
+            self.connection = connection
+            self.queue_name = queue_name
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(error)
 
     # Receptor de HOla Mundo
     def start_consuming(self, on_message_callback):
@@ -58,26 +61,28 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                          delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
                       ))
 
-    # Para vaciar buffers de red y garantizar envio de mensaje a rabbit
     def close(self):
         try:
             if self.connection.is_open: # Para hacer close solo si la conexion esta abierta
                 self.connection.close()
-        except Exception as error:
-            raise MessageMiddlewareCloseError(error) # Levanto el error pedido
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareCloseError(error)
 
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host))
-        channel = connection.channel()
-        channel.exchange_declare(exchange=exchange_name, exchange_type='direct') # Creo el exchange
-        # direct manda mensajes a las colas con binding key = routing key
-        
-        self.channel = channel
-        self.connection = connection
-        self.exchange_name = exchange_name
-        self.routing_keys = routing_keys
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+            channel = connection.channel()
+            channel.exchange_declare(exchange=exchange_name, exchange_type='direct') # Creo el exchange
+            # direct manda mensajes a las colas con binding key = routing key
+            
+            self.channel = channel
+            self.connection = connection
+            self.exchange_name = exchange_name
+            self.routing_keys = routing_keys
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareDisconnectedError(error)
 
     def start_consuming(self, on_message_callback):
         result = self.channel.queue_declare(queue='', exclusive=True)
@@ -117,5 +122,5 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
         try:
             if self.connection.is_open: # Para hacer close solo si la conexion esta abierta
                 self.connection.close()
-        except Exception as error:
-            raise MessageMiddlewareCloseError(error) # Levanto el error pedido
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareCloseError(error)
