@@ -1,7 +1,5 @@
 import pika
-import random
-import string
-from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError
+from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError
 import sys
 import os
 
@@ -57,13 +55,17 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             raise MessageMiddlewareDisconnectedError(error)
     
     def send(self, message):
-        # Mando el mensaje
-        self.channel.basic_publish(exchange='',
-                      routing_key=self.queue_name,
-                      body=message,
-                      properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
-                         delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
-                      ))
+        try:
+            if not self.channel or self.channel.is_closed:
+                raise MessageMiddlewareDisconnectedError("El channel no esta disponible")
+            self.channel.basic_publish(exchange='',
+                        routing_key=self.queue_name,
+                        body=message,
+                        properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
+                            delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
+                        ))
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(error)
 
     def close(self):
         try:
@@ -119,11 +121,15 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             raise MessageMiddlewareDisconnectedError(error)
 
     def send(self, message):
-        # Envio el mensaje a cada routing key
-        for key in self.routing_keys:
-            self.channel.basic_publish(exchange=self.exchange_name, 
-                        routing_key=key, 
-                        body=message)
+        try:
+            if not self.channel or self.channel.is_closed:
+                raise MessageMiddlewareDisconnectedError("El channel no esta disponible para enviar")
+            for key in self.routing_keys:
+                self.channel.basic_publish(exchange=self.exchange_name, 
+                            routing_key=key, 
+                            body=message)
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(error)
  
     def close(self):
         try:
