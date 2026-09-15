@@ -34,7 +34,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                         on_message_callback=callback) # Saco el ACK automatico
 
             self.channel.start_consuming()
-        except pika.exceptions.AMQPConectionError as error:
+        except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareMessageError(error)
@@ -54,7 +54,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                         properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
                             delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
                         ))
-        except pika.exceptions.AMQPConectionError as error:
+        except pika.exceptions.AMQPConnectionError as error:
             # Este error para probelmas de conexion
             raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
@@ -106,7 +106,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
                 queue=queue_name, on_message_callback=callback) # El ACK automatico del tutorial rompia el test
 
             self.channel.start_consuming()
-        except pika.exceptions.AMQPConectionError as error:
+        except pika.exceptions.AMQPConnectionError as error:
             raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
             raise MessageMiddlewareMessageError(error)
@@ -124,7 +124,7 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
                 self.channel.basic_publish(exchange=self.exchange_name, 
                             routing_key=key, 
                             body=message)
-        except pika.exceptions.AMQPConectionError as error:
+        except pika.exceptions.AMQPConnectionError as error:
             # Este error para probelmas de conexion
             raise MessageMiddlewareDisconnectedError(error)
         except pika.exceptions.AMQPError as error:
