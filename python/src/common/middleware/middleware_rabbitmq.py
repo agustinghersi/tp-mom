@@ -1,7 +1,6 @@
 import pika
 from .middleware import MessageMiddlewareQueue, MessageMiddlewareExchange, MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError
-import sys
-import os
+
 
 # Por defecto, RabbitMQ envía cada mensaje al siguiente consumidor, en secuencia. 
 # En promedio, cada consumidor recibe la misma cantidad de mensajes (Round Robin)
@@ -18,14 +17,11 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             self.connection = connection
             self.queue_name = queue_name
         except pika.exceptions.AMQPError as error:
-            # Revisar que error conviene levantar
             raise MessageMiddlewareDisconnectedError(error)
 
-    # Receptor de HOla Mundo
     def start_consuming(self, on_message_callback):
         try:
             self.channel.basic_qos(prefetch_count=1) # Hasta no terminar la tarea, Rabbit no envia otra al worker
-            # Ver que esto puede dar error de llenar la queue despues
 
             def callback(ch, method, properties, body):
                 on_message_callback(
@@ -37,15 +33,11 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             self.channel.basic_consume(queue=self.queue_name,
                         on_message_callback=callback) # Saco el ACK automatico
 
-            # Aca se entra en un bucle infinito, se sale con ctrl C
-            print(' [*] Waiting for messages. To exit press CTRL+C')
             self.channel.start_consuming()
-        except KeyboardInterrupt:
-            print('Interrupted')
-            try:
-                sys.exit(0)
-            except SystemExit:
-                os._exit(0)
+        except pika.exceptions.AMQPConectionError as error:
+            raise MessageMiddlewareDisconnectedError(error)
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(error)
 
     def stop_consuming(self):
         try:
@@ -93,27 +85,31 @@ class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
             raise MessageMiddlewareDisconnectedError(error)
 
     def start_consuming(self, on_message_callback):
-        result = self.channel.queue_declare(queue='', exclusive=True)
-        queue_name = result.method.queue # Rabbit me da el nombre de la queue
+        try:
+            result = self.channel.queue_declare(queue='', exclusive=True)
+            queue_name = result.method.queue # Rabbit me da el nombre de la queue
 
-        # Hago un binding por cada rputing key
-        for key in self.routing_keys:
-            self.channel.queue_bind(exchange=self.exchange_name, 
-                        queue=queue_name, 
-                        routing_key=key)
-        # Ver error si routing_keys esta vacio
+            # Hago un binding por cada rputing key
+            for key in self.routing_keys:
+                self.channel.queue_bind(exchange=self.exchange_name, 
+                            queue=queue_name, 
+                            routing_key=key)
 
-        def callback(ch, method, properties, body):
-            on_message_callback(
-                message=body,
-                ack=lambda: ch.basic_ack(delivery_tag=method.delivery_tag),
-                nack=lambda: ch.basic_nack(delivery_tag=method.delivery_tag)
-            )
+            def callback(ch, method, properties, body):
+                on_message_callback(
+                    message=body,
+                    ack=lambda: ch.basic_ack(delivery_tag=method.delivery_tag),
+                    nack=lambda: ch.basic_nack(delivery_tag=method.delivery_tag)
+                )
 
-        self.channel.basic_consume(
-            queue=queue_name, on_message_callback=callback) # El ACK automatico del tutorial rompia el test
+            self.channel.basic_consume(
+                queue=queue_name, on_message_callback=callback) # El ACK automatico del tutorial rompia el test
 
-        self.channel.start_consuming()
+            self.channel.start_consuming()
+        except pika.exceptions.AMQPConectionError as error:
+            raise MessageMiddlewareDisconnectedError(error)
+        except pika.exceptions.AMQPError as error:
+            raise MessageMiddlewareMessageError(error)
     
     def stop_consuming(self):
         try:
