@@ -52,7 +52,7 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
                         routing_key=self.queue_name,
                         body=message,
                         properties=pika.BasicProperties( # Hago que los mensajes sean persistentes
-                            delivery_mode = pika.DeliveryMode.Persistent # Ver el error de que queden en cache si pasa algo raro
+                            delivery_mode = pika.DeliveryMode.Persistent
                         ))
         except pika.exceptions.AMQPConnectionError as error:
             # Este error para probelmas de conexion
